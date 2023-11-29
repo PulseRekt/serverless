@@ -6,22 +6,26 @@ import AWS from "aws-sdk";
 export const handler = async (event, context) => {
  
   console.log("Event received:", JSON.stringify(event, null, 2));
+  let url, email,assignmentId;
+
  
   if (event.Records) {
     event.Records.forEach(async(record) => {
       const snsMessage = JSON.parse(record.Sns.Message);
       console.log("SNS Message:", snsMessage);
  
-      const url = snsMessage.submission_url;
-      const email = snsMessage.email;
+      url = snsMessage.submissionUrl;
+      email = snsMessage.email;
+      assignmentId = snsMessage.assignmentId
       console.log(`SNS Message ID: ${url}, Text: ${email}`);
     });
   }
-  await bucketSave();
+  await bucketSave(url,email,assignmentId);
 
 };
 
-export const bucketSave = async()=>{
+export const bucketSave = async(url,email,assignment_id)=>{
+  let fileToDownload
 
   console.log("bucket name " + process.env.bucketName);
   const timestampValueForFile = new Date()
@@ -29,14 +33,22 @@ export const bucketSave = async()=>{
     .replace(/[-:]/g, "")
     .replace("T", "_")
     .split(".")[0];
-  const filenameForSubmission = `assignment_${timestampValueForFile}`;
+  const filenameForSubmission = `assignment_${email}_${timestampValueForFile}`;
 
-  const fileUploadInBucket = `${filenameForSubmission}.zip`;
-  const fileToDownload = await axios.get("https://github.com/tparikh/myrepo/archive/refs/tags/v1.0.0.zip",
+  const fileUploadInBucket = `${assignment_id}/${email}/${filenameForSubmission}.zip`;
+  console.log("download from :"+ url);
+
+  try{
+  fileToDownload = await axios.get(url,
     {
       responseType: "arraybuffer",
     }
   );
+}
+catch(error){
+  await sendFailureMail(email,'Submission Failed')
+
+}
  
   const accessKeyToDecode = JSON.parse(
     Buffer.from(process.env.gcpPrivateKey, "base64").toString()
@@ -56,25 +68,26 @@ export const bucketSave = async()=>{
   const bucketName = process.env.bucketName; 
   const bucketForAssignment = storage.bucket(bucketName);
   console.log("bucket name " + process.env.bucketName);
-
+  let path = `${bucketName}/${fileUploadInBucket}`
   try {
     const fileBuffer = Buffer.from(fileToDownload.data);
     await storage.bucket(bucketName).file(fileUploadInBucket).save(fileBuffer);
-    await sendMail('barathis1998@gmail.com','submitted successfully')
+    
+    await sendMail(email,'Submitted successfully',path)
     console.log("upload completed");
   } catch (err) {
     console.log("error " + err);
+    sendFailureMail(email,'Submission Failed',path);
   }
   
 }
 
 
-AWS.config.update({ region: 'us-east-1' }); // Replace 'your-aws-region' with your AWS region
+AWS.config.update({ region: 'us-east-1' }); 
 
 const ses = new AWS.SES();
 
-export const sendMail = async (email, assignmentDetails) => {
-  console.log("inside email");
+export const sendMail = async (email, assignmentDetails,path) => {
   const params = {
     Destination: {
       ToAddresses: [email], 
@@ -83,9 +96,11 @@ export const sendMail = async (email, assignmentDetails) => {
       Body: {
         Html: {
           Charset: 'UTF-8',
-          Data: `<p>Dear student, your assignment has been submitted successfully. Here are the details:</p>
+          Data: `<p>Dear student,</p>
+          <p> Your assignment has been submitted successfully. Here are the details:</p>
                  <p><strong>Assignment Details:</strong></p>
                  <p>${assignmentDetails}</p>
+                 <p><strong>Saved Path:</strong> ${path}</p>
                  <p>Thank you for your submission.</p>`,
         },
         Text: {
@@ -103,7 +118,47 @@ Thank you for your submission.`,
         Data: 'Assignment Submission Successful',
       },
     },
-    Source: 'barathis1998+demo1@gmail.com', 
+    Source: 'Pulse@demo.barathisridhar.me', 
+  };
+
+  try {
+    console.log(params);
+    const data = await ses.sendEmail(params).promise();
+    await trackSentEmail(email, new Date().toISOString(), 'Sent');
+    console.log('Email sent:', data);
+  } catch (error) {
+    await trackSentEmail(email, new Date().toISOString(), 'Failed');
+    console.error('Error sending email:', error);
+  }
+};
+
+export const sendFailureMail = async (email, assignmentDetails) => {
+  const params = {
+    Destination: {
+      ToAddresses: [email], 
+    },
+    Message: {
+      Body: {
+        Html: {
+          Charset: 'UTF-8',
+          Data: `<p>Dear student, there was an issue with your assignment submission</p>
+
+                 <p>Please contact support for assistance.</p>`,
+        },
+        Text: {
+          Charset: 'UTF-8',
+          Data: `Dear student, there was an issue with your assignment submission
+  
+  
+  Please contact support for assistance.`,
+        },
+      },
+      Subject: {
+        Charset: 'UTF-8',
+        Data: 'Assignment Submission Failed',
+      },
+    },
+    Source: 'Pulse@demo.barathisridhar.me', 
   };
 
   try {
