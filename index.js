@@ -96,21 +96,39 @@ export const sendMail = async (email, assignmentDetails,path) => {
       Body: {
         Html: {
           Charset: 'UTF-8',
-          Data: `<p>Dear student,</p>
-          <p> Your assignment has been submitted successfully. Here are the details:</p>
-                 <p><strong>Assignment Details:</strong></p>
-                 <p>${assignmentDetails}</p>
-                 <p><strong>Saved Path:</strong> ${path}</p>
-                 <p>Thank you for your submission.</p>`,
+          Data: `
+            <p>Dear Student,</p>
+            <p>We are pleased to inform you that your assignment has been submitted successfully. Please find the details below:</p>
+            
+            <div style="margin-left: 20px;">
+              <p><strong>Assignment Details:</strong></p>
+              <p>${assignmentDetails}</p>
+              
+              <p><strong>Saved Path:</strong> ${path}</p>
+            </div>
+            
+            <p>Thank you for your dedication and timely submission. If you have any further questions or concerns, please do not hesitate to reach out.</p>
+            
+            <p>Best Regards,</p>
+            <p>PULSE LLC</p>
+          `,
         },
         Text: {
           Charset: 'UTF-8',
-          Data: `Dear student, your assignment has been submitted successfully. Here are the details:
-
-Assignment Details:
-${assignmentDetails}
-
-Thank you for your submission.`,
+          Data: `Dear Student,
+  
+  Your assignment has been submitted successfully. Here are the details:
+  
+  Assignment Details:
+  ${assignmentDetails}
+  
+  Saved Path: ${path}
+  
+  Thank you for your commitment to excellence. If you have any questions, feel free to contact us.
+  
+  Best Regards,
+  PULSE LLC
+      `,
         },
       },
       Subject: {
@@ -118,6 +136,8 @@ Thank you for your submission.`,
         Data: 'Assignment Submission Successful',
       },
     },
+  
+  
     Source: 'Pulse@demo.barathisridhar.me', 
   };
 
@@ -141,7 +161,9 @@ export const sendFailureMail = async (email, assignmentDetails) => {
       Body: {
         Html: {
           Charset: 'UTF-8',
-          Data: `<p>Dear student, there was an issue with your assignment submission</p>
+          Data: `<p>Dear student, 
+                  <p>There was an issue with your assignment submission</p>
+                  <p>Please verify the submission URL and resubmit the assignment</p>
 
                  <p>Please contact support for assistance.</p>`,
         },
